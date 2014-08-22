@@ -1,0 +1,182 @@
+<link rel="import" href="../polymer/polymer.html">
+
+<!--
+Element to register a state and URL 
+
+##### Example
+
+    <route-state html5Mode>
+        <route-state state="section1" url="">
+            <h1>Section 1</h1>
+        </route-state>
+        <route-state state="section2" url="">
+            <h1>Section 2</h1>
+        </route-state>
+    </route-root>
+
+@element route-state
+@blurb Element to register a state and URL 
+@status alpha
+@homepage http://polymerlabs.github.io/seed-element
+-->
+<polymer-element name="route-state" >
+    <template>
+        <style>
+            :host {
+                display: block;
+                width: 100%;
+            }
+        </style>
+        <div hidden?="{{ active == false && childActive == false}}">
+            <content></content>
+        </div>
+
+    </template>
+    <script>
+        (function(){
+            window.Route = window.Route || {children: {}, active: {}};
+
+            Polymer('route-state',{
+                publish: {
+                  /**
+                  *
+                  * @attribute state
+                  * @type string
+                  *
+                  * the name of the state to register
+                  * this must be the full path and not relative
+                  * for example, use `main.sub.foo` not just `foo`
+                  */
+                  state: undefined,
+                  /**
+                  *
+                  * @attribute url
+                  * @type string
+                  *
+                  * the URL part for the state. this is relative to any parent states
+                  * any strings starting with : will be replaced with the data of the same string
+                  * for example, /:myfield will be replaced with the route data.myfield 
+                  */
+                  url: undefined,
+                  /**
+                  *
+                  * @attribute label
+                  * @type string
+                  *
+                  * used as a human readable name for the state
+                  * this attribute is what is displayed in the `<route-toc>` element
+                  */
+                  label: undefined,
+                  /**
+                  *
+                  * @attribute active
+                  * @type bool
+                  *
+                  * applied to the element when the `state` is active
+                  */
+                  active: {
+                    value: false,
+                    reflect: true
+                  },
+                  /**
+                  *
+                  * @attribute childActive
+                  * @type bool
+                  *
+                  * applied to the element when a child state is active
+                  */
+                  childActive: {
+                    value: false,
+                    reflect: true
+                  }
+                },
+                ready: function(){
+                  this.register();
+                },
+                register: function(){
+                    var pieces = this.state.split(".");
+                    this.segments = pieces;
+
+                    var s = this.state;
+                    var element = this;
+
+                    var lastIndex = pieces.length -1;
+
+                    pieces.reduce(function(acc,cur, index){
+                        if(acc[cur] == undefined){
+                            acc[cur] = {};
+                        }
+                        if(index == lastIndex){
+                            acc[cur].$element = element
+                        }
+                        return acc[cur];
+                    },window.Route.children);
+
+                    //console.debug("Registering state: "+ this.state);
+
+                    var observer = new PathObserver(Route, 'active');
+                    observer.open(this.handleObjChange.bind(this));
+                },
+                handleObjChange: function(newValue) {
+
+                    var newSegments = newValue.state.split(".");
+                    var elemSegments = this.segments; // so it is in the closure
+                    var lastIdx = elemSegments.length -1;
+                    var elementState = this.state;
+
+                    this.active = newValue.state == this.state;
+                    this.childActive = newSegments.reduce(function(acc,cur,idx,arr){
+                       // if we already found a false, continue sending false
+                       if(acc == false) {
+                           return false;
+                       }
+                        // if there are more segments than the current state, return what was previously accumulated
+                       else if(idx > lastIdx){
+                           return acc;
+                       }
+                       // If there are more segments in the element than in the active route it should be inactive (unless it's the default state)
+                       else if(lastIdx+1 > arr.length ){
+                           return false;
+                       }
+                       //
+                       else if(newValue.state == elementState){
+                           return false;
+                       }
+                       // if the current segment is the same as the element's then mark it active
+                       return cur == elemSegments[idx];
+                    }, true);
+
+
+                },
+                /**
+                *
+                * @event state-active
+                * @param {Object} detail
+                *
+                * Event fired when the state becomes active
+                */
+                /**
+                *
+                * @event state-inactive
+                * @param {Object} detail
+                *
+                * Event fired when the state is no longer active
+                */
+                activeChanged: function(){
+                    if(this.active){
+                        var detail = {
+                            objState: this.state,
+                            route: Route.active
+                        };
+                        this.data = Route.active.data;
+                        this.fire("state-active",detail);
+                    } else {
+                        this.fire("state-inactive");
+                    }
+                }
+
+            });
+        })();
+
+    </script>
+</polymer-element>
