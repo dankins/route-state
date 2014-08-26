@@ -1,5 +1,7 @@
 <link rel="import" href="../polymer/polymer.html">
 
+<link rel="import" href="../core-animated-pages/transitions/slide-from-right.html">
+<link rel="import" href="../core-transition/core-transition-css.html">
 <!--
 Element to register a state and URL 
 
@@ -21,16 +23,10 @@ Element to register a state and URL
 -->
 <polymer-element name="route-state" >
     <template>
-        <style>
-            :host {
-                display: block;
-                width: 100%;
-            }
-        </style>
-        <div hidden?="{{ active == false && childActive == false}}">
+        <core-meta id="meta" type="transition"></core-meta>
+        <div id="page" hidden?="{{ active == false && childActive == false}}" layout horizontal center center-justified>
             <content></content>
         </div>
-
     </template>
     <script>
         (function(){
@@ -38,60 +34,71 @@ Element to register a state and URL
 
             Polymer('route-state',{
                 publish: {
-                  /**
-                  *
-                  * @attribute state
-                  * @type string
-                  *
-                  * the name of the state to register
-                  * this must be the full path and not relative
-                  * for example, use `main.sub.foo` not just `foo`
-                  */
-                  state: undefined,
-                  /**
-                  *
-                  * @attribute url
-                  * @type string
-                  *
-                  * the URL part for the state. this is relative to any parent states
-                  * any strings starting with : will be replaced with the data of the same string
-                  * for example, /:myfield will be replaced with the route data.myfield 
-                  */
-                  url: undefined,
-                  /**
-                  *
-                  * @attribute label
-                  * @type string
-                  *
-                  * used as a human readable name for the state
-                  * this attribute is what is displayed in the `<route-toc>` element
-                  */
-                  label: undefined,
-                  /**
-                  *
-                  * @attribute active
-                  * @type bool
-                  *
-                  * applied to the element when the `state` is active
-                  */
-                  active: {
-                    value: false,
-                    reflect: true
-                  },
-                  /**
-                  *
-                  * @attribute childActive
-                  * @type bool
-                  *
-                  * applied to the element when a child state is active
-                  */
-                  childActive: {
-                    value: false,
-                    reflect: true
-                  }
+                    /**
+                     *
+                     * @attribute state
+                     * @type string
+                     *
+                     * the name of the state to register
+                     * this must be the full path and not relative
+                     * for example, use `main.sub.foo` not just `foo`
+                     */
+                    state: undefined,
+                    /**
+                     *
+                     * @attribute url
+                     * @type string
+                     *
+                     * the URL part for the state. this is relative to any parent states
+                     * any strings starting with : will be replaced with the data of the same string
+                     * for example, /:myfield will be replaced with the route data.myfield
+                     */
+                    url: undefined,
+                    /**
+                     *
+                     * @attribute label
+                     * @type string
+                     *
+                     * used as a human readable name for the state
+                     * this attribute is what is displayed in the `<route-toc>` element
+                     */
+                    label: undefined,
+                    /**
+                     *
+                     * @attribute active
+                     * @type bool
+                     *
+                     * applied to the element when the `state` is active
+                     */
+                    active: {
+                        value: false,
+                        reflect: true
+                    },
+                    /**
+                     *
+                     * @attribute childActive
+                     * @type bool
+                     *
+                     * applied to the element when a child state is active
+                     */
+                    childActive: {
+                        value: false,
+                        reflect: true
+                    },
+                    /**
+                     *
+                     * @attribute transition
+                     * @type string
+                     *
+                     * the transition to use when activating state
+                     */
+                    transition: undefined
                 },
                 ready: function(){
-                  this.register();
+                    this.register();
+                    if(this.transition != undefined){
+                        this.setupTransition();
+                    }
                 },
                 register: function(){
                     var pieces = this.state.split(".");
@@ -126,45 +133,46 @@ Element to register a state and URL
 
                     this.active = newValue.state == this.state;
                     this.childActive = newSegments.reduce(function(acc,cur,idx,arr){
-                       // if we already found a false, continue sending false
-                       if(acc == false) {
-                           return false;
-                       }
+                        // if we already found a false, continue sending false
+                        if(acc == false) {
+                            return false;
+                        }
                         // if there are more segments than the current state, return what was previously accumulated
-                       else if(idx > lastIdx){
-                           return acc;
-                       }
-                       // If there are more segments in the element than in the active route it should be inactive (unless it's the default state)
-                       else if(lastIdx+1 > arr.length ){
-                           return false;
-                       }
-                       //
-                       else if(newValue.state == elementState){
-                           return false;
-                       }
-                       // if the current segment is the same as the element's then mark it active
-                       return cur == elemSegments[idx];
+                        else if(idx > lastIdx){
+                            return acc;
+                        }
+                        // If there are more segments in the element than in the active route it should be inactive (unless it's the default state)
+                        else if(lastIdx+1 > arr.length ){
+                            return false;
+                        }
+                        //
+                        else if(newValue.state == elementState){
+                            return false;
+                        }
+                        // if the current segment is the same as the element's then mark it active
+                        return cur == elemSegments[idx];
                     }, true);
 
 
                 },
                 /**
-                *
-                * @event state-active
-                * @param {Object} detail
-                *
-                * Event fired when the state becomes active
-                */
+                 *
+                 * @event state-active
+                 * @param {Object} detail
+                 *
+                 * Event fired when the state becomes active
+                 */
                 /**
-                *
-                * @event state-inactive
-                * @param {Object} detail
-                *
-                * Event fired when the state is no longer active
-                */
+                 *
+                 * @event state-inactive
+                 * @param {Object} detail
+                 *
+                 * Event fired when the state is no longer active
+                 */
                 activeChanged: function(){
+                    var detail = {};
                     if(this.active){
-                        var detail = {
+                        detail = {
                             objState: this.state,
                             route: Route.active
                         };
@@ -173,8 +181,22 @@ Element to register a state and URL
                     } else {
                         this.fire("state-inactive");
                     }
-                }
+                    this.async(function(){
+                        if(this._transition != undefined){
+                            detail.opened = this.active;
+                            this._transition.go(this.$.page, detail);
+                        }
+                    });
 
+                },
+                setupTransition: function(){
+                    if (this._transition) {
+                        transition.teardown(this.$.page);
+                    }
+
+                    this._transition = this.$.meta.byId(this.transition);
+                    this._transition.setup(this.$.page);
+                }
             });
         })();
 
