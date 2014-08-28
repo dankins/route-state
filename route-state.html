@@ -24,7 +24,7 @@ Element to register a state and URL
 <polymer-element name="route-state" attributes="resolve scope">
     <template>
         <core-meta id="meta" type="transition"></core-meta>
-        <div id="page" hidden?="{{ active == false && childActive == false}}" layout horizontal center center-justified>
+        <div id="page" layout horizontal center center-justified>
             <content></content>
         </div>
     </template>
@@ -125,10 +125,9 @@ Element to register a state and URL
                     var observer = new PathObserver(Route, 'active');
                     observer.open(this.handleObjChange.bind(this));
                 },
-                _activate: function(data){
-                  data = data == undefined ? {} : data;
-
-                  console.log("TEST",this.state,this.active,this.childActive);
+                _activate: function(route){
+                  route.data = route.data == undefined ? {} : route.data;
+                  this.isActive(route.state);
 
                   // TODO this resolves everything on every route change. This should only be needed if childActive went from false->true
                   this.resolving = true;
@@ -141,7 +140,7 @@ Element to register a state and URL
                         // TODO it may be prudent to check if this is something other than a function
                         // wrap the resolve into a promise and push it onto our array
                         promises.push(
-                            Q.when(this.resolve[prop].call(this.scope,data),function(result){
+                            Q.when(this.resolve[prop].call(this.scope,route.data),function(result){
                                 return {
                                     prop: prop,
                                     resolved: result
@@ -152,18 +151,19 @@ Element to register a state and URL
                   }
 
                   if(promises.length == 0){
-                      this.data = data;
+                      this.data = route.data;
                       this.resolving = false;
-                      return data;
+                      return route;
                   }
                   // sequence the array of promises into a single promise and return that
                   return Q.all(promises).then(function(results){
                       results.forEach(function (result) {
-                          data[result.prop] = result.resolved;
+                          route.data[result.prop] = result.resolved;
                       });
-                      this.data = data;
+                      this.data = route.data;
+                      //route.data = data;
                       this.resolving = false;
-                      return data;
+                      return route;
                   }.bind(this));
                   //res = this.resolve.call(this.scope,data);
                 },
@@ -181,7 +181,21 @@ Element to register a state and URL
                     var lastIdx = elemSegments.length -1;
                     var elementState = this.state;
 
-                    this.active = newValue.state == this.state;
+                    /*
+
+                    */
+                    // need to observe Route.active so we know when to turn off
+                    // TODO can we handle this more efficiently without duplicating in _activate?
+                    this.isActive(newValue.state);
+                    this.handleStateChange();
+                },
+                isActive: function(state){
+                    var newSegments = state.split(".");
+                    var elemSegments = this.segments; // so it is in the closure
+                    var lastIdx = elemSegments.length -1;
+                    var elementState = this.state;
+
+                    this.active = state == this.state;
                     this.childActive = newSegments.reduce(function(acc,cur,idx,arr){
                         // if we already found a false, continue sending false
                         if(acc == false) {
@@ -196,14 +210,19 @@ Element to register a state and URL
                             return false;
                         }
                         //
-                        else if(newValue.state == elementState){
+                        else if(state == elementState){
                             return false;
                         }
                         // if the current segment is the same as the element's then mark it active
                         return cur == elemSegments[idx];
                     }, true);
 
-                    this.handleStateChange();
+
+                    if(!this.active && !this.childActive){
+                        this.setAttribute("hidden",true);
+                    } else {
+                        this.removeAttribute("hidden");
+                    }
                 },
                 /**
                  *
@@ -226,7 +245,7 @@ Element to register a state and URL
                             objState: this.state,
                             route: Route.active
                         };
-                        this.data = Route.active.data;
+                        //this.data = Route.active.data;
                         this.fire("state-active",detail);
                     } else {
                         this.fire("state-inactive");
