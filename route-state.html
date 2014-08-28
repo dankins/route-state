@@ -21,7 +21,7 @@ Element to register a state and URL
 @status alpha
 @homepage http://polymerlabs.github.io/seed-element
 -->
-<polymer-element name="route-state" >
+<polymer-element name="route-state" attributes="resolve scope">
     <template>
         <core-meta id="meta" type="transition"></core-meta>
         <div id="page" hidden?="{{ active == false && childActive == false}}" layout horizontal center center-justified>
@@ -95,6 +95,7 @@ Element to register a state and URL
                     transition: undefined
                 },
                 ready: function(){
+                    this.scope = this;
                     this.register();
                     if(this.transition != undefined){
                         this.setupTransition();
@@ -124,6 +125,55 @@ Element to register a state and URL
                     var observer = new PathObserver(Route, 'active');
                     observer.open(this.handleObjChange.bind(this));
                 },
+                _activate: function(data){
+                  data = data == undefined ? {} : data;
+
+                  console.log("TEST",this.state,this.active,this.childActive);
+
+                  // TODO this resolves everything on every route change. This should only be needed if childActive went from false->true
+                  this.resolving = true;
+
+                  var promises = [];
+
+                  for (var property in this.resolve) {
+                    var prop = property; // put prop in closure for after resolved
+                    if (this.resolve.hasOwnProperty(prop)) {
+                        // TODO it may be prudent to check if this is something other than a function
+                        // wrap the resolve into a promise and push it onto our array
+                        promises.push(
+                            Q.when(this.resolve[prop].call(this.scope,data),function(result){
+                                return {
+                                    prop: prop,
+                                    resolved: result
+                                }
+                            }.bind(this))
+                        )
+                    }
+                  }
+
+                  if(promises.length == 0){
+                      this.data = data;
+                      this.resolving = false;
+                      return data;
+                  }
+                  // sequence the array of promises into a single promise and return that
+                  return Q.all(promises).then(function(results){
+                      results.forEach(function (result) {
+                          data[result.prop] = result.resolved;
+                      });
+                      this.data = data;
+                      this.resolving = false;
+                      return data;
+                  }.bind(this));
+                  //res = this.resolve.call(this.scope,data);
+                },
+                _pre: function(){
+
+                },
+                _post: function(){
+
+                },
+                resolve: {},
                 handleObjChange: function(newValue) {
 
                     var newSegments = newValue.state.split(".");
@@ -153,7 +203,7 @@ Element to register a state and URL
                         return cur == elemSegments[idx];
                     }, true);
 
-
+                    this.handleStateChange();
                 },
                 /**
                  *
@@ -169,7 +219,7 @@ Element to register a state and URL
                  *
                  * Event fired when the state is no longer active
                  */
-                activeChanged: function(){
+                handleStateChange: function(){
                     var detail = {};
                     if(this.active){
                         detail = {
