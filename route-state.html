@@ -21,7 +21,7 @@ Element to register a state and URL
 @status alpha
 @homepage http://polymerlabs.github.io/seed-element
 -->
-<polymer-element name="route-state" attributes="resolve scope">
+<polymer-element name="route-state" attributes="resolve scope" hidden>
     <template>
         <core-meta id="meta" type="transition"></core-meta>
         <div id="page" layout horizontal center center-justified>
@@ -134,18 +134,20 @@ Element to register a state and URL
 
                   var promises = [];
 
+                  var resolveCallback =  function(prop,result){
+                        return {
+                            prop: prop,
+                            resolved: result
+                        }
+                    };
+
                   for (var property in this.resolve) {
-                    var prop = property; // put prop in closure for after resolved
-                    if (this.resolve.hasOwnProperty(prop)) {
+                    if (this.resolve.hasOwnProperty(property)) {
                         // TODO it may be prudent to check if this is something other than a function
                         // wrap the resolve into a promise and push it onto our array
+
                         promises.push(
-                            Q.when(this.resolve[prop].call(this.scope,route.data),function(result){
-                                return {
-                                    prop: prop,
-                                    resolved: result
-                                }
-                            }.bind(this))
+                            Q.when(this.resolve[property].call(this.scope,route.data), resolveCallback.bind(this,property))
                         )
                     }
                   }
